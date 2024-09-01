@@ -11,6 +11,9 @@ COPY .mvn .mvn
 # Give executable permission to the Maven wrapper script
 RUN chmod +x mvnw
 
+# Convert line endings for Maven wrapper script
+RUN sed -i 's/\r$//' mvnw
+
 # Copy the application source code
 COPY src ./src
 
