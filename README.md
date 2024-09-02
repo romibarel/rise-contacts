@@ -141,10 +141,10 @@ There are two main classes in this project:
 1. Clone the Repository: 
 `git clone https://github.com/your-repo/contacts-management-api.git
 cd contacts-management-api` .
-2. Build the Docker Image:
-In the root directory of the project (where the Dockerfile is located).
+2. Navigate to the root directory with `cd rise-contacts/rise-contacts` . 
+3. Build the Docker Image:
 `docker build -t rise-contacts .`
-3. Run the Docker Container:
+4. Run the Docker Container:
 `docker run -v path/to/resources/dir:/app/src/main/resources -p 8080:8080 rise-contacts`.
    - Replace `path/to/resources/dir` with your (full) path to the resources dir.
    - Example: `docker run -v C:/Users/Owner/Desktop/rise-contacts3/rise-contacts/src/main/resources:/app/src/main/resources -p 8080:8080 rise-contacts`.
