@@ -23,6 +23,14 @@ public class Contact {
         this.id = -1;
     }
 
+    public Contact(String firstName, String lastName, String phone, String address, int id) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.phone = phone;
+        this.address = address;
+        this.id = id;
+    }
+
     public String getFirstName() {
         return firstName;
     }

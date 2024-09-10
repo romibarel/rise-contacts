@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import org.mockito.MockedStatic;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -31,13 +31,14 @@ public class AddContactTests {
     @Test
     public void testAddContactSuccess() {
         List<Contact> mockContacts = new ArrayList<>();
-        Contact contact1 = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
+        Contact contact1 = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701", 1);
         Contact contact2 = new Contact("Jane", "Smith", "+1-555-987-6543", "456 Oak Avenue, Chicago, IL, 60610");
         mockContacts.add(contact1);
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
-            return true;
+        dbManagerMock.when(() -> DBManager.addContact(any(Contact.class))).thenAnswer(invocation -> {
+            mockContacts.add(contact2);
+            return 2;
         });
+        when(DBManager.getNumOfContacts()).thenReturn(2);
         String result = contactsController.addContact(contact2);
         assertEquals("Contact was successfully added to page 0. <br>"+contact2.toString(), result);
         assertTrue(mockContacts.containsAll(List.of(contact1, contact2)));
@@ -48,30 +49,11 @@ public class AddContactTests {
     public void testAddContactFirst() {
         List<Contact> mockContacts = new ArrayList<>();
         Contact contact1 = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
-            List<Contact> contacts = invocation.getArgument(0);
-            mockContacts.clear();
-            mockContacts.addAll(contacts);
-            return true;
+        dbManagerMock.when(() -> DBManager.addContact(any(Contact.class))).thenAnswer(invocation -> {
+            mockContacts.add(contact1);
+            return 2;
         });
-        String result = contactsController.addContact(contact1);
-        assertEquals("Contact was successfully added to page 0. <br>"+contact1.toString(), result);
-        assertTrue(mockContacts.contains(contact1));
-        assertTrue(contact1.getId() > -1);
-    }
-
-    @Test
-    public void testAddContactNullContacts() {
-        List<Contact> mockContacts = new ArrayList<>();
-        Contact contact1 = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
-        when(DBManager.readContactsFromFile()).thenReturn(null);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
-            List<Contact> contacts = invocation.getArgument(0);
-            mockContacts.clear();
-            mockContacts.addAll(contacts);
-            return true;
-        });
+        when(DBManager.getNumOfContacts()).thenReturn(2);
         String result = contactsController.addContact(contact1);
         assertEquals("Contact was successfully added to page 0. <br>"+contact1.toString(), result);
         assertTrue(mockContacts.contains(contact1));
@@ -81,9 +63,8 @@ public class AddContactTests {
     @Test
     public void testAddContactFailure() {
         Contact contact1 = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
-        when(DBManager.readContactsFromFile()).thenReturn(null);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
-            return false;
+        dbManagerMock.when(() -> DBManager.addContact(any(Contact.class))).thenAnswer(invocation -> {
+            return -1;
         });
         String result = contactsController.addContact(contact1);
         assertEquals("Failed to add contact.", result);

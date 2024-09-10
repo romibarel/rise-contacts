@@ -8,10 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyInt;
 import org.mockito.MockedStatic;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 public class DeleteContactTests {
     private MockedStatic<DBManager> dbManagerMock;
@@ -31,11 +30,13 @@ public class DeleteContactTests {
     @Test
     public void testDeleteContactSuccess() {
         List<Contact> mockContacts = new ArrayList<>();
-        Contact contact = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
-        contact.setId(0);
+        Contact contact = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701", 1);
         mockContacts.add(contact);
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
+        dbManagerMock.when(() -> DBManager.getContactById(anyInt())).thenAnswer(invocation -> {
+            return contact;
+        });
+        dbManagerMock.when(() -> DBManager.deleteContact(anyInt())).thenAnswer(invocation -> {
+            mockContacts.remove(contact);
             return true;
         });
         String result = contactsController.deleteContact(0);
@@ -45,29 +46,23 @@ public class DeleteContactTests {
 
     @Test
     public void testDeleteContactIdNotFound() {
-        List<Contact> mockContacts = new ArrayList<>();
-        Contact contact = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
-        contact.setId(0);
-        mockContacts.add(contact);
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
-            return true;
+        dbManagerMock.when(() -> DBManager.getContactById(anyInt())).thenAnswer(invocation -> {
+            return null;
         });
         String result = contactsController.deleteContact(1);
-        assertEquals(String.format("User with ID 1 was not found.", contact.toString()), result);
+        assertEquals("User with ID 1 was not found.", result);
     }
 
     @Test
     public void testDeleteContactFail() {
-        List<Contact> mockContacts = new ArrayList<>();
-        Contact contact = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701");
-        contact.setId(0);
-        mockContacts.add(contact);
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
-        dbManagerMock.when(() -> DBManager.rewriteContactsFile(anyList())).thenAnswer(invocation -> {
+        Contact contact = new Contact("John", "Doe", "+1-555-123-4567", "123 Elm Street, Springfield, IL, 62701", 1);
+        dbManagerMock.when(() -> DBManager.getContactById(anyInt())).thenAnswer(invocation -> {
+            return contact;
+        });
+        dbManagerMock.when(() -> DBManager.deleteContact(anyInt())).thenAnswer(invocation -> {
             return false;
         });
-        String result = contactsController.deleteContact(0);
-        assertEquals(String.format("Failed to delete contact.", contact.toString()), result);
+        String result = contactsController.deleteContact(1);
+        assertEquals("Failed to delete user with ID 1.", result);
     }
 }

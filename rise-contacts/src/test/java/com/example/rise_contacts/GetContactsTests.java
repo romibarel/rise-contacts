@@ -7,9 +7,9 @@ import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.anyInt;
 import org.mockito.MockedStatic;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 public class GetContactsTests {
 
@@ -34,7 +34,9 @@ public class GetContactsTests {
         Contact contact2 = new Contact("Jane", "Smith", "+1-555-987-6543", "456 Oak Avenue, Chicago, IL, 60610");
         mockContacts.add(contact1);
         mockContacts.add(contact2);
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
+        dbManagerMock.when(() -> DBManager.readContacts(anyInt(), anyInt())).thenAnswer(invocation -> {
+            return mockContacts;
+        });
         String result = contactsController.getContacts();
         String expected = "1. "+ contact1.toString() + "<br>"+
                             "2. "+contact2.toString() + "<br>";
@@ -43,15 +45,18 @@ public class GetContactsTests {
 
     @Test
     public void testGetContactsEmpty() {
-        List<Contact> mockContacts = new ArrayList<>();
-        when(DBManager.readContactsFromFile()).thenReturn(mockContacts);
+        dbManagerMock.when(() -> DBManager.readContacts(anyInt(), anyInt())).thenAnswer(invocation -> {
+            return new ArrayList<>();
+        });
         String result = contactsController.getContacts();
         assertEquals("Contacts book is empty.", result);
     }
 
     @Test
     public void testGetContactsNull() {
-        when(DBManager.readContactsFromFile()).thenReturn(null);
+        dbManagerMock.when(() -> DBManager.readContacts(anyInt(), anyInt())).thenAnswer(invocation -> {
+            return null;
+        });
         String result = contactsController.getContacts();
         assertEquals("failed to load contacts", result);
     }

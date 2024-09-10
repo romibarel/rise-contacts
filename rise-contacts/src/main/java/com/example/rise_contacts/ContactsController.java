@@ -1,6 +1,5 @@
 package com.example.rise_contacts;
 
-import java.util.LinkedList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -22,7 +21,7 @@ public class ContactsController {
 
     @GetMapping("/contacts")
     public String getContacts() {
-        List<Contact> contacts = DBManager.readContactsFromFile();
+        List<Contact> contacts = DBManager.readContacts(0, CONTACTS_PER_PAGE);
         if (contacts == null) {
             return FAILED_TO_LOAD_CONTACTS_MESSAGE;
         }
@@ -32,33 +31,28 @@ public class ContactsController {
 
     @GetMapping("/contacts/{page}")
     public String getContacts(@PathVariable int page) {
-        List<Contact> contacts = DBManager.readContactsFromFile();
+        List<Contact> contacts = DBManager.readContacts(page, CONTACTS_PER_PAGE);
         if (contacts == null) {
             return FAILED_TO_LOAD_CONTACTS_MESSAGE;
         }
         logger.info("Conacts loaded successfully");
-        int lastPage = contacts.size() / CONTACTS_PER_PAGE;
-        if (page<0 || page>lastPage) {
+        if (page<0 || (page > 0 && contacts.isEmpty())) {
+            int lastPage = DBManager.getNumOfContacts() / CONTACTS_PER_PAGE;
+            if (lastPage <0) {
+                logger.error("Failed to get total number of contacts");
+                return "Page out of bounds.";
+            }
             logger.error("Attempted to request a page out of bounds.");
             return String.format("Page out of bounds, please select a page from 0 to %d.", lastPage);
         }
-        return contacts.isEmpty() ? "Contacts book is empty." : getContactListString(contacts, page*CONTACTS_PER_PAGE);
+        return contacts.isEmpty() ? "Contacts book is empty." : getContactListString(contacts, page);
     }
 
     @GetMapping("/contacts/search/{token}")
     public String searchContacts(@PathVariable String token) {
-        List<Contact> contacts = DBManager.readContactsFromFile();
-        if (contacts == null) {
+        List<Contact> matches = DBManager.getMatches(token, CONTACTS_PER_PAGE);
+        if (matches == null) {
             return FAILED_TO_LOAD_CONTACTS_MESSAGE;
-        }
-        List<Contact> matches = new LinkedList<>();
-        for (Contact contact : contacts) {
-            if (isContainsIgnoreCase(contact.getFirstName(), token)
-                || isContainsIgnoreCase(contact.getLastName(), token)
-                || isContainsIgnoreCase(contact.getPhone(), token)
-                || isContainsIgnoreCase(contact.getAddress(), token)) {
-                matches.add(contact);
-            }
         }
         logger.info("Contact search success");
         return matches.isEmpty() ? String.format("No matches for %s.", token) : getContactListString(matches, 0);
@@ -66,31 +60,20 @@ public class ContactsController {
 
     @PostMapping("/contacts")
     public String addContact(@RequestBody Contact newContact) {
-        List<Contact> contacts = DBManager.readContactsFromFile();
-        int id = 0;
-        if (contacts == null || contacts.isEmpty()) {
-            contacts = new LinkedList<>();
-        } else {
-            id = contacts.get(contacts.size()-1).getId() + 1;
-        }
-        newContact.setId(id);
-        contacts.add(newContact);
-        if (!DBManager.rewriteContactsFile(contacts)) {
+        int id = DBManager.addContact(newContact);
+        if (id < 0) {
             String error = "Failed to add contact.";
             logger.error(error);
             return error;
         }
+        newContact.setId(id);
         logger.info("Adding new contact to contacts file success.");
-        return String.format("Contact was successfully added to page %d. <br>%s", (contacts.size()-1)/CONTACTS_PER_PAGE, newContact.toString());
+        return String.format("Contact was successfully added to page %d. <br>%s", (DBManager.getNumOfContacts()-1)/CONTACTS_PER_PAGE, newContact.toString());
     }
 
     @PutMapping("/contacts/{id}")
     public String editContact(@PathVariable int id, @RequestBody Contact updatedContact) {
-        List<Contact> contacts = DBManager.readContactsFromFile();
-        if (contacts == null) {
-            return FAILED_TO_LOAD_CONTACTS_MESSAGE;
-        }
-        Contact toEdit = getContactById(id, contacts);
+        Contact toEdit = DBManager.getContactById(id);
         if (toEdit == null) {
             logger.error("Attempted to edit contact with invalid contact ID.");
             return String.format("User with ID %d was not found.", id);
@@ -100,10 +83,9 @@ public class ContactsController {
         toEdit.setLastName(updatedContact.getLastName()==null ? toEdit.getLastName() : updatedContact.getLastName());
         toEdit.setPhone(updatedContact.getPhone()==null ? toEdit.getPhone() : updatedContact.getPhone());
         toEdit.setAddress(updatedContact.getAddress()==null ? toEdit.getAddress() : updatedContact.getAddress());
-        if (!DBManager.rewriteContactsFile(contacts)) {
-            String error = "Failed to edit contact.";
-            logger.error(error);
-            return error;
+        if (!DBManager.editContact(id, toEdit)) {
+            logger.error("Failed to edit contact.");
+            return String.format("Failed to edit contact with ID %d.", id);
         }
         logger.info("Successfully edited contact with id "+id);
         return String.format("Contact with ID %d was updated:<br>%s", id, toEdit.toString());
@@ -111,60 +93,42 @@ public class ContactsController {
 
     @DeleteMapping("/contacts/{id}")
     public String deleteContact(@PathVariable int id) {
-        List<Contact> contacts = DBManager.readContactsFromFile();
-        if (contacts == null) {
-            return FAILED_TO_LOAD_CONTACTS_MESSAGE;
-        }
-        Contact toDelete = getContactById(id, contacts);
+        Contact toDelete = DBManager.getContactById(id);
         if (toDelete == null) {
             logger.error("Attempted to delete contact with invalid contact ID.");
             return String.format("User with ID %d was not found.", id);
         }
-        contacts.remove(toDelete);
-        if (!DBManager.rewriteContactsFile(contacts)) {
-            String error = "Failed to delete contact.";
+        if (!DBManager.deleteContact(id)) {
+            String error = String.format("Failed to delete user with ID %d.", id);
             logger.error(error);
-            return error;
+            return String.format(error);
         }
-        logger.info("Successfully deleted contact with id "+id);
-
+        logger.info(String.format("Successfully deleted contact with id %d.", id));
         return String.format("Deleted contact %s.", toDelete.toString());
+    }
+
+    @DeleteMapping("/contacts/reset")
+    public String resetContacts() {
+        String message = "Failed to reset contacts.";
+        if (!DBManager.resetContacts()) {
+            logger.error(message);
+            return message;
+        }
+        message = "Contacts reset successfully.";
+        logger.info(message);
+        return message;
     }
 
     public int getContactsPerPage() {
         return CONTACTS_PER_PAGE;
     }
 
-    private Contact getContactById(int id, List<Contact> contacts) {
-        Contact answer = null;
-        if (contacts == null) {
-            return null;
-        }
-        for (Contact contact : contacts) {
-            if (contact.getId()==id) {
-                answer = contact;
-                break;
-            }
-        }
-        return answer;
-    }
-
-    private boolean isContainsIgnoreCase(String fullTerm, String searchTerm) {
-        fullTerm = fullTerm.toLowerCase();
-        searchTerm = searchTerm.toLowerCase();
-        return fullTerm.contains(searchTerm);
-    }
-
-    private String getContactListString(List<Contact> contacts, int startIndex) {
-        int counter = 0;
+    private String getContactListString(List<Contact> contacts, int page) {
+        int counter = page*CONTACTS_PER_PAGE+1;
         String result = "";
-        List<Contact> contactsSublist = contacts.subList(startIndex, contacts.size());
-        for (Contact contact : contactsSublist) {
-            result += (counter+startIndex+1) +". "+ contact.toString() + "<br>";
+        for (Contact contact : contacts) {
+            result += counter +". "+ contact.toString() + "<br>";
             counter++;
-            if (counter==10) {
-                break;
-            }
         } 
         return result;
     }
